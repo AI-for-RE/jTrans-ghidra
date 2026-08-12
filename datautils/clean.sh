@@ -1,5 +1,4 @@
-rm log/*
-rm idb/*
-rm -rf extract/*
-rm dataset_strip/*
-mkdir log idb extract dataset_strip
+#!/bin/sh
+# Reset the working directories between runs.
+rm -rf log/* ghidra_proj/* extract/* dataset_strip/*
+mkdir -p log ghidra_proj extract dataset_strip

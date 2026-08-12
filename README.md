@@ -20,7 +20,7 @@ This repo is the official code of **jTrans: Jump-Aware Transformer for Binary Co
 - Python 3.8+
 - PyTorch 1.10+
 - CUDA 10.2+
-- IDA pro 7.5+ (only used for dataset processing)
+- Ghidra 11.3+ with PyGhidra (only used for dataset processing)
 
 ### Quick Start
 
@@ -33,7 +33,7 @@ conda activate jtrans
 **b. Install PyTorch and other packages.**
 ```
 conda install pytorch cudatoolkit=11.0 -c pytorch
-python -m pip install simpletransformers networkx pyelftools
+python -m pip install simpletransformers networkx pyelftools pyghidra
 ```
 
 **c. Get code and models of jTrans.**
@@ -65,7 +65,7 @@ python fasteval.py
 
 **f. Try jTrans on your own binaries**
 
-Make sure you have IDA pro 7.5+ and following the instructions at [datautils](datautils/README.md). After extracting features of your binaries, you can try jTrans on them such as the usage at [eval_save.py](./eval_save.py).
+Make sure you have Ghidra 11.3+ and following the instructions at [datautils](datautils/README.md). After extracting features of your binaries, you can try jTrans on them such as the usage at [eval_save.py](./eval_save.py).
 
 ## Dataset
 - We present a new large-scale and diversified dataset, [BinaryCorp](https://cloud.vul337.team:8443/s/cxnH8DfZTADLKCs), for the task of binary code similarity detection. 
