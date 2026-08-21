@@ -5,29 +5,35 @@ from shutil import move
 import pickle
 from functools import reduce
 import networkx as nx
+import pyghidra 
 
 def pairdata(data_dir):
     def get_prefix(path): # get proj name
         l = path.split('-')
         prefix = '-'.join(l[:-2])
         return prefix.split('/')[-1]
-
+    
     proj2file = defaultdict(list) # proj to filename list
     for root, dirs, files in os.walk(data_dir, topdown=False):
+        
         for name in tqdm(files):
-            pickle_path = os.path.join(root, name)
-            prefix = get_prefix(pickle_path)
-            proj2file[prefix].append(name)
+            if not 'extract/out' in root:
+                pickle_path = os.path.join(root, name)
+                
+                prefix = get_prefix(pickle_path)
+                prefix = os.path.dirname(pickle_path).split(data_dir)[-1].strip('/')
+                
+                proj2file[prefix].append(name)
 
     for proj, filelist in proj2file.items():
-        if not os.path.exists(os.path.join(data_dir, proj)):
-            os.mkdir(os.path.join(data_dir, proj))
+        if not os.path.exists(os.path.join(data_dir, "out", proj)):
+            os.makedirs(os.path.join(data_dir, "out", proj), exist_ok=True)
 
         binary_func_list = []
         pkl_list = []
         for name in filelist:
-            src = os.path.join(data_dir, name)
-            dst = os.path.join(data_dir, proj, name)
+            src = os.path.join(data_dir, proj, name)
+            dst = os.path.join(data_dir, "out", proj, name)
             pkl = pickle.load(open(src, 'rb'))
             pkl_list.append(pkl)
             func_list = []
@@ -45,5 +51,5 @@ def pairdata(data_dir):
             for pkl in pkl_list:
                 saved_index[func_name].append(pkl[func_name])
 
-        saved_pickle_name = os.path.join(data_dir, proj, 'saved_index.pkl') # pari data
+        saved_pickle_name = os.path.join(data_dir, 'out', proj, 'saved_index.pkl') # pari data
         pickle.dump(dict(saved_index), open(saved_pickle_name, 'wb'))

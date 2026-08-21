@@ -29,6 +29,8 @@ SKIP_BLOCKS = {'.plt', '.plt.got', '.plt.sec', '.init', '.fini', 'extern', 'EXTE
 
 
 def offset_of(address):
+
+    # return int(address.getPhysicalAddress().getOffset())
     return int(address.getOffset())
 
 
@@ -182,8 +184,16 @@ class BinaryData(Binarybase):
             block = self.memory.getBlock(entry)
             if block is not None and block.getName() in SKIP_BLOCKS:
                 continue
+            
+            block = self.program.getMemory().getBlock(entry)
             addr = offset_of(entry)
-            print("[+] %s" % func.getName())
+            # We need this in order to correctly convert to the physical address
+            # which is used by the elf file things!!!
+            for info in block.getSourceInfos():
+                if info.contains(entry):
+                    addr = info.getFileBytesOffset(entry)
+            # addr = offset_of(file_offset)
+            print(f"[+] {func.getName()} {addr}")
             asm_list = self.get_asm(func)
             rawbytes_list = self.get_rawbytes(func)
             cfg = self.get_cfg(func)
@@ -213,11 +223,14 @@ def main():
     assert os.path.exists(args.binary), f'{args.binary} not exists'
     assert os.path.exists(args.dataroot), f"DATAROOT {args.dataroot} does not exist"
     assert os.path.exists(args.saveroot), f"SAVEROOT {args.saveroot} does not exist"
+    full_filename = args.binary
+    if full_filename.endswith('.strip'):
+        full_filename = full_filename[:-len('.strip')]
 
-    filename = os.path.basename(args.binary)
-    if filename.endswith('.strip'):
-        filename = filename[:-len('.strip')]
-    unstrip_path = args.unstrip_path or os.path.join(args.dataroot, filename)
+    base_filename = os.path.basename(args.binary)
+    if base_filename.endswith('.strip'):
+        base_filename = base_filename[:-len('.strip')]
+    unstrip_path = args.unstrip_path or os.path.join(args.dataroot, base_filename)
 
     install_dir = args.ghidra_install_dir or os.environ.get('GHIDRA_INSTALL_DIR')
     if not install_dir:
@@ -229,13 +242,21 @@ def main():
     saved_dict = {}
     with pyghidra.open_program(args.binary,
                                project_location=args.project_location,
-                               project_name=args.project_name or filename,
+                               project_name=args.project_name or base_filename,
                                analyze=True) as flat_api:
         binary_data = BinaryData(unstrip_path, flat_api)
         for func_name, func, asm_list, rawbytes_list, cfg, feature in binary_data.extract_all():
-            saved_dict[func_name] = [func, asm_list, rawbytes_list, cfg, feature]
+            # print(type(func_name), type(func), type(asm_list), type(rawbytes_list), type(cfg), type(feature))
+            saved_dict[func_name] = [int(func), asm_list, rawbytes_list, cfg, feature]
 
-    saved_path = os.path.join(args.saveroot, filename + "_extract.pkl")  # unpair data
+
+    full_out_dir = os.path.dirname(full_filename)
+    # hardcoding is bad but it's the best option we have
+    full_out_dir = full_out_dir.replace('dataset_strip', '')
+    # print("output:", args.saveroot, full_out_dir)
+    saved_path = os.path.join(args.saveroot, full_out_dir, os.path.basename(full_filename) + "_extract.pkl")  # unpair data
+    
+    os.makedirs(os.path.dirname(saved_path), exist_ok=True)
     with open(saved_path, 'wb') as f:
         pickle.dump(saved_dict, f)
     print("[*] %d functions saved to %s" % (len(saved_dict), saved_path))

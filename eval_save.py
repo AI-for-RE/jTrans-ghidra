@@ -1,3 +1,4 @@
+from portability_utils import get_device
 from transformers import BertTokenizer, BertForMaskedLM, BertModel
 from tokenizer import *
 import pickle
@@ -8,7 +9,10 @@ import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 from data import help_tokenize, load_paired_data,FunctionDataset_CL
-from transformers import AdamW
+try:
+    from transformers import AdamW
+except ImportError:
+    from torch.optim import AdamW
 import torch.nn.functional as F
 import argparse
 import wandb
@@ -27,16 +31,17 @@ def get_logger(name):
     logger.addHandler(s_handle)
     return logger
 
-def eval(model, args, valid_set, logger):
+def eval(model, args, valid_set, logger, num_workers=24):
 
     if WANDB:
         wandb.init(project=f'jTrans-finetune')
         wandb.config.update(args)
     logger.info("Initializing Model...")
-    device = torch.device("cuda")
+    # device = torch.device("cuda")
+    device = get_device()
     model.to(device)
     logger.info("Finished Initialization...")
-    valid_dataloader = DataLoader(valid_set, batch_size=args.eval_batch_size, num_workers=24, shuffle=True)
+    valid_dataloader = DataLoader(valid_set, batch_size=args.eval_batch_size, num_workers=num_workers, shuffle=True)
     global_steps = 0
     etc=0
     logger.info(f"Doing Evaluation ...")
@@ -56,8 +61,8 @@ def finetune_eval(net, data_loader):
         cons=[]
         eval_iterator = tqdm(data_loader)
         for i, (seq1,seq2,seq3,mask1,mask2,mask3) in enumerate(eval_iterator):
-                input_ids1, attention_mask1= seq1.cuda(),mask1.cuda()
-                input_ids2, attention_mask2= seq2.cuda(),mask2.cuda()
+                input_ids1, attention_mask1= seq1.to(device), mask1.to(device)
+                input_ids2, attention_mask2= seq2.to(device), mask2.to(device)
                 print(input_ids1.shape)
                 print(attention_mask1.shape)
                 anchor,pos=0,0
@@ -112,19 +117,22 @@ if __name__ == '__main__':
     parser.add_argument("--dataset_path", type=str, default='./BinaryCorp/small_test', help="Path to the dataset")
     parser.add_argument("--experiment_path", type=str, default='./experiments/BinaryCorp-3M/jTrans.pkl', help="Path to the experiment")
     parser.add_argument("--tokenizer", type=str, default='./jtrans_tokenizer/')
-
+    parser.add_argument("--num_workers", type=int, default=24, help="Number of workers for data loading")
     args = parser.parse_args()
 
     from datetime import datetime
     now = datetime.now() # current date and time
     TIMESTAMP="%Y%m%d%H%M"
     tim = now.strftime(TIMESTAMP)
-    logger = get_logger(f"jTrans-{args.model_path}-eval-{args.dataset_path}_savename_{args.experiment_path}_{tim}")
+
+    logger_name = f"jTrans-{os.path.basename(args.model_path)}-eval-{os.path.basename(args.dataset_path)}_savename_{os.path.basename(args.experiment_path)}_{tim}"
+    logger = get_logger(logger_name)
     logger.info(f"Loading Pretrained Model from {args.model_path} ...")
     model = BinBertModel.from_pretrained(args.model_path)
 
     model.eval()
-    device = torch.device("cuda")
+    # device = torch.device("cuda")
+    device = get_device()
     model.to(device)
 
     logger.info("Done ...")
@@ -141,7 +149,7 @@ if __name__ == '__main__':
                 ret1=tokenizer([pairs[idx]], add_special_tokens=True,max_length=512,padding='max_length',truncation=True,return_tensors='pt') #tokenize them
                 seq1=ret1['input_ids']
                 mask1=ret1['attention_mask']
-                input_ids1, attention_mask1= seq1.cuda(),mask1.cuda()
+                input_ids1, attention_mask1= seq1.to(device), mask1.to(device)
                 output=model(input_ids=input_ids1,attention_mask=attention_mask1)
                 anchor=output.pooler_output
                 ft_valid_dataset.ebds[i][j]=anchor.detach().cpu()

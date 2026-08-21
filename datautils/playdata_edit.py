@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #!/usr/bin/env python3
 import os
+import pprint
 import networkx as nx
 from collections import defaultdict
 from tqdm import tqdm
@@ -25,17 +26,22 @@ class DatasetBase(object):
 
     def traverse_file(self):
         for root, dirs, _ in os.walk(self.path):
+            # print(f"root: {root}, dirs: {dirs}")
             for dir in dirs:
                 if self.all_data:
+                    # print(f"Listing files in directory: {os.path.join(root, dir)}")
+                    # print(f"Files found: {os.listdir(os.path.join(root, dir))}")
                     for file in os.listdir(os.path.join(root, dir)):
+                        # print(file)
                         if os.path.isfile(os.path.join(root, dir, file)):
+                            # print(f"yielding: {dir}, {file}, {os.path.join(root, dir, file)}")
                             yield dir, file, os.path.join(root, dir, file)
                 else:
                     for filter in self.prefixfilter:
                         if dir.startswith(filter):
                             for file in os.listdir(os.path.join(root, dir)):
-                                if os.path.isfile(os.path.join(root, dir, file)):
-                                    yield dir, file, os.path.join(root, dir, file)
+                                if os.path.isfile(file):
+                                    yield dir, file, os.path.join(root, dir, file)          
 
     def load_pickle(self, file):
         with open(file, 'rb') as f:
@@ -58,7 +64,9 @@ class DatasetBase(object):
                 if filename == 'saved_index.pkl':
                     continue
                 opt = filename.split('-')[-2]
+                # print(opt)
                 if opt in self.opt:
+                    # print(filename)
                     pickle_data = self.load_pickle(pkl_path)
                     self.paired[proj][opt] = pickle_data
     
@@ -111,6 +119,8 @@ class DatasetBase(object):
                          # for func_data in func_data_list:
                          #       func_addr, asm_list, rawbytes_list, cfg, biai_featrue = func_data
         else:
+            print("PAIRED DATA")
+            pprint.pprint(self.paired)
             for proj, pkl_dict in self.paired.items():
                 if len(pkl_dict) < 2:
                     continue
@@ -141,7 +151,6 @@ class DataBaseCrossCompiler(DatasetBase):
                 compiler = filename.split('-')[-3]
                 final_opt = compiler+opt
                 if opt in self.opt:
-                    # print(filename)
                     pickle_data = self.load_pickle(pkl_path)
                     self.paired[proj][final_opt] = pickle_data
         else:
@@ -174,11 +183,11 @@ class DataBaseCrossCompiler(DatasetBase):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_path', type=str, default='../extract')
+    parser.add_argument('--dataset_path', type=str, default='./extract/out')
     parser.add_argument('--prefixfilter', type=str, default=None)
     parser.add_argument('--all_data', type=bool, default=True)
     args = parser.parse_args()
-    dataset = DatasetBase(args.dataset_path, args.prefixfilter, args.all_data)
+    dataset = DatasetBase(args.dataset_path, args.prefixfilter, args.all_data, opt=['O0', 'O1', 'O2', 'O3', 'Os'])
     # used for pretrain
     dataset.load_unpair_data()
     # used for contrastive learning
@@ -186,30 +195,33 @@ if __name__ == '__main__':
     pretrain_dataset = dataset.get_unpaird_data()
     cnt = 0
     for proj, func_name, func_addr, asm_list, rawbytes_list, cfg, biai_featrue in tqdm(pretrain_dataset):
-        # print(proj, func_name, func_addr, asm_list, rawbytes_list, cfg, biai_featrue)
+        pprint.pprint((proj, func_name, func_addr, asm_list, rawbytes_list, cfg, biai_featrue))
         pass
 
+    
     # demo for contrastive learning dataset in different optimization level
-    dataset = DatasetBase('./extract', ["arenatracker-git-ArenaTracker"], False, ['O0', 'O1'])
+    # dataset = DatasetBase('./extract/out/libpng/', ["libpng"], False, ['O0', 'O3', 'Os'])
+    print("PAIRS")
     dataset.load_pair_data()
     ft_dataset = dataset.get_paired_data()
     for proj, func_name, func_data in ft_dataset:
-        for opt in ['O0', 'O1']:
+        pprint.pprint(f"PRINTING FUNCTION {func_name}")
+        for opt in ['O0', 'O1', 'O2', 'O3', 'Os']:
             func_addr, asm_list, rawbytes_list, cfg, biai_featrue = func_data[opt]
-            print(func_name, hex(func_addr))
+            pprint.pprint((func_name, hex(func_addr)))
 
-    # demo for cross compiler dataset 
-    dataset = DataBaseCrossCompiler('../extractDataset/coreutils', ["coreutils-b2sum"], False, ['O0', 'Os'])
-    dataset.load_pair_data()
-    cnt = 0
-    functions = []
+    # # demo for cross compiler dataset 
+    # dataset = DataBaseCrossCompiler('../extractDataset/coreutils', ["coreutils-b2sum"], False, ['O0', 'Os'])
+    # dataset.load_pair_data()
+    # cnt = 0
+    # functions = []
 
-    for proj, func_name, func_data in dataset.get_paired_data():
-        for opt in ['O0', 'Os']:
-            for compiler in ['gcc', 'clang']:
-                print('opt: ', opt, 'compiler', compiler)
-                func_addr, asm_list, rawbytes_list, cfg, biai_featrue = func_data[compiler+opt]
-                print(func_name, hex(func_addr))
-        cnt += 1
-        if cnt > 5:
-            break
+    # for proj, func_name, func_data in dataset.get_paired_data():
+    #     for opt in ['O0', 'Os']:
+    #         for compiler in ['gcc', 'clang']:
+    #             print('opt: ', opt, 'compiler', compiler)
+    #             func_addr, asm_list, rawbytes_list, cfg, biai_featrue = func_data[compiler+opt]
+    #             print(func_name, hex(func_addr))
+    #     cnt += 1
+    #     if cnt > 5:
+    #         break

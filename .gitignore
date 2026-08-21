@@ -221,3 +221,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+
+# Jacob edits:
+datautils/ghidra_proj/**
+datautils/ghidra_proj_old/**
+small_test
+small_train
+
+train_on_extracted.sh
+
+scrap
+dbs/**
+.vscode/
+
+.gitignore
