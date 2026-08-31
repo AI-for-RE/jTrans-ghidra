@@ -1,3 +1,4 @@
+from portability_utils import get_device
 import pickle
 import sys
 from datautils.playdata import DatasetBase as DatasetBase
@@ -22,13 +23,14 @@ def eval_O(ebds,TYPE1,TYPE2):
             continue
 
     ft_valid_dataset=FunctionDataset_Fast(funcarr1,funcarr2)
-    dataloader = DataLoader(ft_valid_dataset, batch_size=POOLSIZE, num_workers=24, shuffle=True)
+    # num_workers is normally 24, changed for CPU ease of use!
+    dataloader = DataLoader(ft_valid_dataset, batch_size=POOLSIZE, num_workers=0, shuffle=True)
     SIMS=[]
     Recall_AT_1=[]
-
+    device = get_device()
     for idx, (anchor,pos) in enumerate(tqdm(dataloader)):
-        anchor = anchor.cuda()
-        pos =pos.cuda()
+        anchor = anchor.to(device)
+        pos = pos.to(device)
         if anchor.shape[0]==POOLSIZE:
             for i in range(len(anchor)):    # check every vector of (vA,vB)
                 vA=anchor[i:i+1]  #pos[i]
@@ -70,7 +72,6 @@ if __name__ == '__main__':
     ff.close()
 
     print(f'evaluating...poolsize={POOLSIZE}')
-
     eval_O(ebds,'O0','O3')
     eval_O(ebds,'O0','Os')
     eval_O(ebds,'O1','Os')

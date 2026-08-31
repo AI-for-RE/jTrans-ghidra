@@ -57,14 +57,19 @@ def strip_binary(target, output):
 
 
 def process_one(job):
+
     """Strip one binary and extract its features with process.py."""
     target, no_strip = job
+    nice_path = target.split(dataset_dir)[1]
+    
     filename = os.path.basename(target)
-
+    
     if no_strip:
         ghidra_input = target
     else:
-        ghidra_input = os.path.join(strip_path, filename + '.strip')
+        ghidra_input = os.path.join(strip_path, nice_path + '.strip')
+        os.makedirs(os.path.dirname(ghidra_input), exist_ok=True)
+        # ghidra_input = os.path.join(strip_path, filename + '.strip')
         if not strip_binary(target, ghidra_input):
             return filename, -1
 

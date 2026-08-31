@@ -1,3 +1,4 @@
+from portability_utils import get_device
 from unicodedata import name
 from transformers import BertTokenizer, BertForMaskedLM, BertModel
 import torch.multiprocessing
@@ -8,7 +9,10 @@ import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 from data import load_paired_data, FunctionDataset_CL, FunctionDataset_CL_Load
-from transformers import AdamW
+try:
+    from transformers import AdamW
+except ImportError:
+    from torch.optim import AdamW
 import torch.nn.functional as F
 import argparse
 import wandb
@@ -47,7 +51,8 @@ def train_dp(model, args, train_set, valid_set, logger):
         wandb.config.update(args)
 
     logger.info("Initializing Model...")
-    device = torch.device("cuda")
+    # device = torch.device("cuda")
+    device = get_device()
     model.to(device)
     logger.info("Finished Initialization...")
     train_dataloader = DataLoader(train_set, batch_size=args.batch_size, num_workers=48, shuffle=True, prefetch_factor=4)
@@ -89,9 +94,9 @@ def train_dp(model, args, train_set, valid_set, logger):
         loss_list = []
         for i, (seq1,seq2,seq3,mask1,mask2,mask3) in enumerate(train_iterator):
             t1=time.time()
-            input_ids1, attention_mask1 = seq1.cuda(),mask1.cuda()
-            input_ids2, attention_mask2 = seq2.cuda(),mask2.cuda()
-            input_ids3, attention_mask3 = seq3.cuda(),mask3.cuda()
+            input_ids1, attention_mask1 = seq1.to(device), mask1.to(device)
+            input_ids2, attention_mask2 = seq2.to(device), mask2.to(device)
+            input_ids3, attention_mask3 = seq3.to(device), mask3.to(device)
 
             optimizer.zero_grad()
             anchor,pos,neg=0,0,0
@@ -146,8 +151,8 @@ def finetune_eval(net, data_loader):
         cons=[]
         eval_iterator = tqdm(data_loader)
         for i, (seq1,seq2,_,mask1,mask2,_) in enumerate(eval_iterator):
-            input_ids1, attention_mask1= seq1.cuda(),mask1.cuda()
-            input_ids2, attention_mask2= seq2.cuda(),mask2.cuda()
+            input_ids1, attention_mask1= seq1.to(device), mask1.to(device)
+            input_ids2, attention_mask2= seq2.to(device), mask2.to(device)
 
             anchor,pos=0,0
 
@@ -240,8 +245,8 @@ if __name__ == '__main__':
     load_train, load_test = False, False
     # load_train = f"{args.load_path}/jTrans-{args.train_path.split('/')[-1]}.pkl"
     # load_test = f"{args.load_path}/jTrans-{args.eval_path.split('/')[-1]}.pkl"
-    ft_train_dataset= FunctionDataset_CL_Load(tokenizer,args.train_path,convert_jump_addr=True, load=load_train, opt=['O0','O1','O2','O3','Os'])
-    ft_valid_dataset=FunctionDataset_CL_Load(tokenizer,args.eval_path,convert_jump_addr=True, load=load_test, opt=['O0','O1','O2','O3','Os'])
+    ft_train_dataset= FunctionDataset_CL_Load(tokenizer,args.train_path,convert_jump_addr=True, load=load_train)
+    ft_valid_dataset=FunctionDataset_CL_Load(tokenizer,args.eval_path,convert_jump_addr=True, load=load_test)
     if not load_train:
         pickle.dump(ft_train_dataset.datas, open(f"{args.load_path}/jTrans-{args.train_path.split('/')[-1]}.pkl", 'wb'))
         pickle.dump(ft_valid_dataset.datas, open(f"{args.load_path}/jTrans-{args.eval_path.split('/')[-1]}.pkl", 'wb'))

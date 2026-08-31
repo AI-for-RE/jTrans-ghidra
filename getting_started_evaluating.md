@@ -1,0 +1,7 @@
+This file was not written by the original authors of jTrans. It contains a how-to guide to using jTrans-Ghidra for generating embeddings assuming you do not want to finetune your own model.
+
+
+1. Perform all the environment setup operations in `README.md`. You do not need to download `small_train.tar.gz`/`small_test.tar.gz`, but you will need to download `experiments.tar.gz`. It may still be useful to download /`small_test.tar.gz` for easy testing.
+2. Put the binaries you want to pre-process in `datautils/dataset`. Follow the instructions in `datautils/README.md`. Note that you can put folders in `datautils/dataset` and the system should be able to handle them. Note that you need to have the filenames structued in such a way that `filename.split('-')[-2]` contains the compiler optimisation level of the binary (this is a jTrans thing rather than something new).
+3. After running `datautils/run.py` (from inside the `datautils` directory), you can find your processed data in `extract/out`. Move the binaries you want to embed to a new folder and then run `eval_save.py`. Refer to `eval_save.py -h` for more specifics.
+4. You now have your embeddings. `saved_index.pkl` is your "summary file" for the folder it's contained in. You may want to investigate their structure if needed.
