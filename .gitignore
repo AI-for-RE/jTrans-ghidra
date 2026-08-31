@@ -237,4 +237,9 @@ dbs/**
 .vscode/
 
 datautils/dataset_strip/**
+datautils/dataset/**
 datautils/extract/**
+datautils/log/**
+# eval_save.py's logger_name embeds a timestamp per run, e.g.
+# jTrans-jTrans-finetune-eval-out_savename_foo.pkl_202608311449
+jTrans-*-eval-*/**
