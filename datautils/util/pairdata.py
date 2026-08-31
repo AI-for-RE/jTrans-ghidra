@@ -6,6 +6,9 @@ import pickle
 from functools import reduce
 import networkx as nx
 import pyghidra 
+from dataclasses import dataclass, fields
+from typing import Any, TextIO
+from .variant import Variant, get_comp_string
 
 def pairdata(data_dir):
     def get_prefix(path): # get proj name
@@ -15,15 +18,16 @@ def pairdata(data_dir):
     
     proj2file = defaultdict(list) # proj to filename list
     for root, dirs, files in os.walk(data_dir, topdown=False):
-        
-        for name in tqdm(files):
-            if not 'extract/out' in root:
-                pickle_path = os.path.join(root, name)
-                
-                prefix = get_prefix(pickle_path)
-                prefix = os.path.dirname(pickle_path).split(data_dir)[-1].strip('/')
-                
-                proj2file[prefix].append(name)
+        dirs[:] = [d for d in dirs if d != "out"]
+        if not 'out' in root.split(os.sep):
+            for name in tqdm(files):
+
+                    pickle_path = os.path.join(root, name)
+
+                    prefix = get_prefix(pickle_path)
+                    prefix = os.path.dirname(pickle_path).split(data_dir)[-1].strip('/')
+                    
+                    proj2file[prefix].append(name)
 
     for proj, filelist in proj2file.items():
         if not os.path.exists(os.path.join(data_dir, "out", proj)):

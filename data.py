@@ -12,6 +12,8 @@ import readidadata
 import torch
 import random
 import time
+# import datautils.util.variant as vr
+
 MAXLEN=512
 
 vocab_data = open("./jtrans_tokenizer/vocab.txt").read().strip().split("\n") + ["[SEP]", "[PAD]", "[CLS]", "[MASK]"]
@@ -81,52 +83,61 @@ def load_unpair_data(datapath,filt=None,alldata=True,convert_jump=True,opt=None,
         if len(func_str) > 0:
             fp.write(func_str+"\n")
 
-def load_paired_data(datapath,filt=None,alldata=True,convert_jump=True,opt=None,add_ebd=False):
-   
-    dataset = DatasetBase(datapath,filt,alldata, opt=opt)
+def load_paired_data(datapath,filt=None,alldata=True,convert_jump=True,add_ebd=False,min_variants=None):
+
+    dataset = DatasetBase(datapath,filt,alldata)
     functions=[]
     func_emb_data=[]
     SUM=0
-    for i in dataset.get_paired_data_iter():  #proj, func_name, func_addr, asm_list, rawbytes_list, cfg, bai_featrue
+    
+    for i in dataset.get_paired_data_iter(min_variants=min_variants):  #proj, func_name, func_addr, asm_list, rawbytes_list, cfg, bai_featrue
+        # print(f"SUM {SUM}")
         functions.append([])
         if add_ebd:
             func_emb_data.append({'proj':i[0],'funcname':i[1]})
-        for o in opt:
-            if i[2].get(o):                   
-                f=i[2][o]
-                func_str=gen_funcstr(f,convert_jump)
-                if len(func_str)>0:
-                    if add_ebd:
-                        func_emb_data[-1][o]=len(functions[-1])
-                    functions[-1].append(func_str)
-                    SUM+=1
+        for o in i[2]:
+            f=i[2][o]
+            func_str=gen_funcstr(f,convert_jump)
+            if len(func_str)>0:
+                if add_ebd:
+                    func_emb_data[-1][o]=len(functions[-1])
+                functions[-1].append(func_str)
+                SUM+=1
 
     print('TOTAL ',SUM)
     return functions,func_emb_data
 
 class FunctionDataset_CL(torch.utils.data.Dataset): #binary version dataset
-    def __init__(self,tokenizer,path='../BinaryCorp/extract',filt=None,alldata=True,convert_jump_addr=True,opt=None,add_ebd=True):  #random visit
-        functions,ebds=load_paired_data(datapath=path,filt=filt,alldata=alldata,convert_jump=convert_jump_addr,opt=opt,add_ebd=add_ebd)
+    def __init__(self,tokenizer,path='../BinaryCorp/extract',filt=None,alldata=True,convert_jump_addr=True,add_ebd=True,min_variants=None):  #random visit
+        functions,ebds=load_paired_data(datapath=path,filt=filt,alldata=alldata,convert_jump=convert_jump_addr,add_ebd=add_ebd,min_variants=min_variants)
         self.datas=functions
         self.ebds=ebds
         self.tokenizer=tokenizer
-        self.opt=opt
+        # self.opt=opt
         self.convert_jump_addr=True
     def __getitem__(self, idx):             #also return bad pair
 
         pairs=self.datas[idx]
-        if self.opt==None:
-            pos=random.randint(0,len(pairs)-1)
+        # if self.opt==None:
+        pos=random.randint(0,len(pairs)-1)
+        # A single-variant function has no distinct positive to draw, and the loop
+        # below would spin forever. That can only happen if the dataset was built with
+        # min_variants=1 (the embedding-only union) and then used as a training
+        # DataLoader; degenerate anchor==positive beats hanging. Contrastive training
+        # should keep the default min_variants=None, which guarantees >= 2 variants.
+        if len(pairs) < 2:
+            pos2=pos
+        else:
             pos2=random.randint(0,len(pairs)-1)
             while pos2==pos:
                 pos2=random.randint(0,len(pairs)-1)
-            f1=pairs[pos]   #give three pairs
-            f2=pairs[pos2]
-        else:
-            pos=0
-            pos2=1
-            f1=pairs[pos]
-            f2=pairs[pos2]
+        f1=pairs[pos]   #give three pairs
+        f2=pairs[pos2]
+        # else:
+        #     pos=0
+        #     pos2=1
+        #     f1=pairs[pos]
+        #     f2=pairs[pos2]
         ftype=random.randint(0,len(self.datas)-1)
         while ftype==idx:
             ftype=random.randint(0,len(self.datas)-1)
@@ -150,16 +161,16 @@ class FunctionDataset_CL(torch.utils.data.Dataset): #binary version dataset
         return len(self.datas)
 
 class FunctionDataset_CL_Load(torch.utils.data.Dataset): #binary version dataset
-    def __init__(self,tokenizer,path='../BinaryCorp/extract',filt=None,alldata=True,convert_jump_addr=True,opt=None,add_ebd=True, load=None):  #random visit
+    def __init__(self,tokenizer,path='../BinaryCorp/extract',filt=None,alldata=True,convert_jump_addr=True,add_ebd=True, load=None):  #random visit
         if load:
             start = time.time()
             self.datas = pickle.load(open(load, 'rb'))
             print('load time:', time.time() - start)
             self.tokenizer=tokenizer
-            self.opt=opt
+            # self.opt=opt
             self.convert_jump_addr=True
         else:
-            functions,ebds=load_paired_data(datapath=path,filt=filt,alldata=alldata,convert_jump=convert_jump_addr,opt=opt,add_ebd=add_ebd)
+            functions,ebds=load_paired_data(datapath=path,filt=filt,alldata=alldata,convert_jump=convert_jump_addr,add_ebd=add_ebd)
             self.datas=[]
             for func_list in functions:
                 tmp = []
@@ -168,23 +179,23 @@ class FunctionDataset_CL_Load(torch.utils.data.Dataset): #binary version dataset
                 self.datas.append(tmp)
             self.ebds=ebds
             self.tokenizer=tokenizer
-            self.opt=opt
+            # self.opt=opt
             self.convert_jump_addr=True
     def __getitem__(self, idx):             #also return bad pair
 
         pairs=self.datas[idx]
-        if self.opt!=None:
-            pos=random.randint(0,len(pairs)-1)
+        # if self.opt!=None:
+        pos=random.randint(0,len(pairs)-1)
+        pos2=random.randint(0,len(pairs)-1)
+        while pos2==pos:
             pos2=random.randint(0,len(pairs)-1)
-            while pos2==pos:
-                pos2=random.randint(0,len(pairs)-1)
-            f1=pairs[pos]   #give three pairs
-            f2=pairs[pos2]
-        else:
-            pos=0
-            pos2=1
-            f1=pairs[pos]
-            f2=pairs[pos2]
+        f1=pairs[pos]   #give three pairs
+        f2=pairs[pos2]
+        # else:
+        #     pos=0
+        #     pos2=1
+        #     f1=pairs[pos]
+        #     f2=pairs[pos2]
         ftype=random.randint(0,len(self.datas)-1)
         while ftype==idx:
             ftype=random.randint(0,len(self.datas)-1)

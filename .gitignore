@@ -236,4 +236,5 @@ scrap
 dbs/**
 .vscode/
 
-.gitignore
+datautils/dataset_strip/**
+datautils/extract/**

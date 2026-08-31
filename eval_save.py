@@ -118,6 +118,11 @@ if __name__ == '__main__':
     parser.add_argument("--experiment_path", type=str, default='./experiments/BinaryCorp-3M/jTrans.pkl', help="Path to the experiment")
     parser.add_argument("--tokenizer", type=str, default='./jtrans_tokenizer/')
     parser.add_argument("--num_workers", type=int, default=24, help="Number of workers for data loading")
+    parser.add_argument("--min_variants", type=int, default=1,
+                        help="Embed every function present in at least this many compilation variants. "
+                             "Defaults to 1 (the full union) since embedding each variant is independent "
+                             "and forms no pairs. Pass 0 to restore the old behaviour of only embedding "
+                             "functions present in EVERY variant, which discards ~20%% of functions.")
     args = parser.parse_args()
 
     from datetime import datetime
@@ -140,19 +145,25 @@ if __name__ == '__main__':
     logger.info("Tokenizer Done ...")
    
     logger.info("Preparing Datasets ...")
-    ft_valid_dataset=FunctionDataset_CL(tokenizer,args.dataset_path,None,True,opt=['O0', 'O1', 'O2', 'O3', 'Os'], add_ebd=True, convert_jump_addr=True)
+    ft_valid_dataset=FunctionDataset_CL(tokenizer,args.dataset_path,None,True, add_ebd=True, convert_jump_addr=True,
+                                        min_variants=(None if args.min_variants == 0 else args.min_variants))
     for i in tqdm(range(len(ft_valid_dataset.datas))):
         pairs=ft_valid_dataset.datas[i]
-        for j in ['O0','O1','O2','O3','Os']:
-            if ft_valid_dataset.ebds[i].get(j) is not None:
-                idx=ft_valid_dataset.ebds[i][j]
-                ret1=tokenizer([pairs[idx]], add_special_tokens=True,max_length=512,padding='max_length',truncation=True,return_tensors='pt') #tokenize them
-                seq1=ret1['input_ids']
-                mask1=ret1['attention_mask']
-                input_ids1, attention_mask1= seq1.to(device), mask1.to(device)
+        opt_keys = [k for k in ft_valid_dataset.ebds[i] if k not in ('proj', 'funcname')]
+        for j in opt_keys:
+            idx=ft_valid_dataset.ebds[i][j]
+            ret1=tokenizer([pairs[idx]], add_special_tokens=True,max_length=512,padding='max_length',truncation=True,return_tensors='pt') #tokenize them
+            seq1=ret1['input_ids']
+            mask1=ret1['attention_mask']
+            input_ids1, attention_mask1= seq1.to(device), mask1.to(device)
+            # Inference only -- the result is detached immediately below, so building an
+            # autograd graph just wastes roughly half the activation memory (and time).
+            # Matters on a shared GPU: without this the pass OOMs when another job holds
+            # most of the card.
+            with torch.no_grad():
                 output=model(input_ids=input_ids1,attention_mask=attention_mask1)
                 anchor=output.pooler_output
-                ft_valid_dataset.ebds[i][j]=anchor.detach().cpu()
+            ft_valid_dataset.ebds[i][j]=anchor.detach().cpu()
 
     logger.info("ebds start writing")
     fi=open(args.experiment_path,'wb')
