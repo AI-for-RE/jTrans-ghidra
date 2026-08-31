@@ -174,7 +174,7 @@ class BinaryData(Binarybase):
             'edges': list(cfg.edges()),
         }
 
-    def extract_all(self):
+def extract_all(self):
         for func in self.func_manager.getFunctions(True):
             if func.isExternal() or func.isThunk():
                 continue
@@ -182,8 +182,14 @@ class BinaryData(Binarybase):
             block = self.memory.getBlock(entry)
             if block is not None and block.getName() in SKIP_BLOCKS:
                 continue
+
             addr = offset_of(entry)
-            print("[+] %s" % func.getName())
+            # We need this in order to correctly convert to the physical address
+            # which is used by the elf file things!!!
+            for info in block.getSourceInfos():
+                if info.contains(entry):
+                    addr = info.getFileBytesOffset(entry)
+            print(f"[+] {func.getName()} {addr}")
             asm_list = self.get_asm(func)
             rawbytes_list = self.get_rawbytes(func)
             cfg = self.get_cfg(func)
