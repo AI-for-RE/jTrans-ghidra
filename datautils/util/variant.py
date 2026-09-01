@@ -25,7 +25,8 @@ class Variant:
 def get_info(path):
     basename = os.path.basename(os.path.normpath(path))
     lib_info, separator, _ = basename.rpartition("-")
-    lib_name, version_name, compiler_name, compiler_version, arch, optimisation_level = lib_info.split('-')
+    head, compiler_name, compiler_version, arch, optimisation_level = lib_info.rsplit('-', 4)
+    lib_name, _, version_name = head.partition('-')
     oup_variant = Variant(compiler_name, compiler_version, optimisation_level, arch)
     return lib_name, version_name, oup_variant
 

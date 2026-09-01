@@ -184,8 +184,7 @@ class BinaryData(Binarybase):
             block = self.memory.getBlock(entry)
             if block is not None and block.getName() in SKIP_BLOCKS:
                 continue
-            
-            block = self.program.getMemory().getBlock(entry)
+
             addr = offset_of(entry)
             # We need this in order to correctly convert to the physical address
             # which is used by the elf file things!!!

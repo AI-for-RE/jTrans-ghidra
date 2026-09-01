@@ -240,6 +240,15 @@ datautils/dataset_strip/**
 datautils/dataset/**
 datautils/extract/**
 datautils/log/**
-# eval_save.py's logger_name embeds a timestamp per run, e.g.
-# jTrans-jTrans-finetune-eval-out_savename_foo.pkl_202608311449
-jTrans-*-eval-*/**
+# eval_save.py builds a descriptive logger_name and passes it straight to
+# logging.basicConfig(filename=...), so the "logger name" becomes a FILE in this
+# directory -- one per invocation, timestamped to the minute, no extension. E.g.
+#   jTrans-jTrans-finetune-eval-out_savename_foo.pkl_202608311449
+# NOTE: this pattern deliberately has no trailing "/**". That suffix matches only
+# directories, which is why an earlier "jTrans-*-eval-*/**" left these files showing
+# up as untracked. A bare pattern matches both files and directories.
+jTrans-*-eval-*
+
+# finetune_eval() appends MRR to this hardcoded filename. Unused by the embedding
+# path, so it normally does not exist -- ignored so it cannot appear as a surprise.
+logft.txt
